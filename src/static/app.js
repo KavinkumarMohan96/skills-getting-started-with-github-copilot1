@@ -20,12 +20,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-        `;
+
+          // Build participants list HTML with delete icon and no bullets
+          let participantsHTML = "";
+          if (details.participants.length > 0) {
+            participantsHTML = `
+              <div class="participants-section">
+                <strong>Participants:</strong>
+                <ul class="participants-list">
+                  ${details.participants.map(email => `
+                    <li>
+                      <span class="participant-email">${email}</span>
+                      <span class="delete-icon" title="Remove" data-activity="${name}" data-email="${email}">&#128465;</span>
+                    </li>
+                  `).join("")}
+                </ul>
+              </div>
+            `;
+          } else {
+            participantsHTML = `
+              <div class="participants-section">
+                <strong>Participants:</strong>
+                <p class="no-participants">No participants yet</p>
+              </div>
+            `;
+          }
+
+          activityCard.innerHTML = `
+            <h4>${name}</h4>
+            <p>${details.description}</p>
+            <p><strong>Schedule:</strong> ${details.schedule}</p>
+            <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+            ${participantsHTML}
+          `;
 
         activitiesList.appendChild(activityCard);
 
@@ -34,6 +61,40 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+
+          // Add delete icon event listeners after card is added
+          setTimeout(() => {
+            const deleteIcons = activityCard.querySelectorAll('.delete-icon');
+            deleteIcons.forEach(icon => {
+              icon.addEventListener('click', async (e) => {
+                const activityName = icon.getAttribute('data-activity');
+                const email = icon.getAttribute('data-email');
+                try {
+                  const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, {
+                    method: 'POST',
+                  });
+                  const result = await response.json();
+                  if (response.ok) {
+                    messageDiv.textContent = result.message;
+                    messageDiv.className = 'success';
+                    messageDiv.classList.remove('hidden');
+                    fetchActivities();
+                  } else {
+                    messageDiv.textContent = result.detail || 'An error occurred';
+                    messageDiv.className = 'error';
+                    messageDiv.classList.remove('hidden');
+                  }
+                  setTimeout(() => {
+                    messageDiv.classList.add('hidden');
+                  }, 5000);
+                } catch (error) {
+                  messageDiv.textContent = 'Failed to unregister. Please try again.';
+                  messageDiv.className = 'error';
+                  messageDiv.classList.remove('hidden');
+                }
+              });
+            });
+          }, 0);
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
@@ -62,6 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // Refresh activities list after signup
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
